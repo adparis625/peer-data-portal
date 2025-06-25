@@ -178,14 +178,6 @@ if plot_df.empty or not sel_inds:
     st.warning("No data/indicators selected.")
     st.stop()
 
-if event:
-    point = event[0]
-    # Determine which country was clicked
-    country_clicked = point.get("x") or point.get("hovertext")
-    snap_row = data[data["Country"] == country_clicked]
-    if not snap_row.empty and snap_row["SnapshotURL"].iloc[0]:
-        url = snap_row["SnapshotURL"].iloc[0]
-        st.markdown(f"**Policy snapshot:** [{url}]({url})", unsafe_allow_html=True)
 
 # ───────── 7. Build chart with Plotly ──────────────────────────────────────
 if chart_type == "Bar":
