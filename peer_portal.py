@@ -178,6 +178,15 @@ if plot_df.empty or not sel_inds:
     st.warning("No data/indicators selected.")
     st.stop()
 
+if event:
+    point = event[0]
+    # Determine which country was clicked
+    country_clicked = point.get("x") or point.get("hovertext")
+    snap_row = data[data["Country"] == country_clicked]
+    if not snap_row.empty and snap_row["SnapshotURL"].iloc[0]:
+        url = snap_row["SnapshotURL"].iloc[0]
+        st.markdown(f"**Policy snapshot:** [{url}]({url})", unsafe_allow_html=True)
+
 # ───────── 7. Build chart with Plotly ──────────────────────────────────────
 if chart_type == "Bar":
     fig = px.bar(plot_df, x=plot_df.columns[0], y=sel_inds, barmode="group")
@@ -195,29 +204,67 @@ elif chart_type == "Funnel":
     funnel.columns = ["Stage", "Value"]
     fig = px.funnel(funnel, x="Value", y="Stage")
 elif chart_type == "Map":
+    ind = sel_inds[0]
+
+    # ----------------  ISO-3 lookup  ----------------
+    overrides = {"Cabo Verde": "CPV", "South Sudan": "SSD"}   # add any tricky names
     def iso3(name):
+        if name in overrides:
+            return overrides[name]
         try:
             return pycountry.countries.lookup(name).alpha_3
         except Exception:
             return None
+
     plot_df["iso"] = plot_df[plot_df.columns[0]].apply(iso3)
-    fig = px.choropleth(plot_df, locations="iso", color=sel_inds[0],
-                        hover_name=plot_df.columns[0],
-                        color_continuous_scale="Blues")
+
+    # ----------------  999 → NaN  -------------------
+    plot_df.loc[plot_df[ind] == 999, ind] = np.nan   # <- key line
+
+    # numeric coercion just in case
+    plot_df[ind] = pd.to_numeric(plot_df[ind], errors="ignore")
+
+    # keep only rows with both ISO and real value
+    plot_df = plot_df.dropna(subset=["iso", ind])
+
+    if plot_df.empty:
+        st.warning("No mappable data for this filter / indicator.")
+        st.stop()
+
+    # decide scale type
+    uniq = plot_df[ind].dropna().unique()
+    if plot_df[ind].dtype.kind in "fi" and len(uniq) > 10:
+        # continuous
+        fig = px.choropleth(
+            plot_df, locations="iso", color=ind,
+            hover_name=plot_df.columns[0],
+            color_continuous_scale="Blues",
+            title=f"{stat} of {ind}"
+        )
+    else:
+        # categorical
+        plot_df["cat"] = plot_df[ind].astype(str)
+        palette = px.colors.qualitative.Safe
+        color_map = {c: palette[i % len(palette)]
+                     for i, c in enumerate(sorted(plot_df["cat"].unique()))}
+
+        fig = px.choropleth(
+            plot_df, locations="iso", color="cat",
+            hover_name=plot_df.columns[0],
+            color_discrete_map=color_map,
+            title=f"{ind} categories"
+        )
+        fig.update_layout(coloraxis_colorbar=None)
+
+    fig.update_layout(height=560, margin=dict(l=20, r=20, t=40, b=10))
+
+
 else:
     st.info("Select ≥2 indicators for Scatter/Radar.")
     st.stop()
 st.plotly_chart(fig, use_container_width=True)
 event = spe.plotly_events(fig, click_event=True, hover_event=False)
 
-if event:
-    point = event[0]
-    # Determine which country was clicked
-    country_clicked = point.get("x") or point.get("hovertext")
-    snap_row = data[data["Country"] == country_clicked]
-    if not snap_row.empty and snap_row["SnapshotURL"].iloc[0]:
-        url = snap_row["SnapshotURL"].iloc[0]
-        st.markdown(f"**Policy snapshot:** [{url}]({url})", unsafe_allow_html=True)
 
 fig.update_layout(height=560, margin=dict(l=20, r=20, t=40, b=10))
 st.subheader(f"{chart_type} – {stat}")
