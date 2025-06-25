@@ -122,28 +122,35 @@ data = df.loc[mask, ["Country", "Region", "Income"] + sel_inds].copy()
 
 st.subheader("Filtered table")
 
+
+
+
+st.subheader("Filtered table")
+
 table_key = "data_table"
 
 table = st.data_editor(
     data,
-    hide_index=False,
-    disabled=True,            # read-only
-    height=300,
+    hide_index=False,           # show grey index column
+    row_selection="single",     # enable selection
     use_container_width=True,
+    height=300,
     key=table_key
 )
 
-# grab the selection only if the key already exists in session_state
-rows = st.session_state.get(table_key, {}).get("selected_rows", [])
-if rows:
-    idx = rows[0]                             # first selected row index
-    url = data.iloc[idx].get("SnapshotURL")
-    if url:
-        st.markdown(
-            f"**Policy snapshot:** [{url}]({url})",
-            unsafe_allow_html=True
-        )
-
+# read selected row indices safely
+selected = st.session_state.get(table_key, {}).get("selected_rows", [])
+if selected:
+    # data_editor returns a list of dicts -> get the first item's row number
+    row_num = selected[0]["_index"] if isinstance(selected[0], dict) else selected[0]
+    url = data.iloc[row_num].get("SnapshotURL")
+    if pd.notna(url) and url != "":
+        st.markdown(f"**Policy snapshot:** [{url}]({url})",
+                    unsafe_allow_html=True)
+    else:
+        st.info("No snapshot link for this country.")
+else:
+    st.caption("ℹ️ Click the grey row-number to open that country’s snapshot")
 
 # download buttons
 csv = data.to_csv(index=False).encode()
