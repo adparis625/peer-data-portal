@@ -11,7 +11,7 @@ if "store" not in st.session_state:
     st.session_state.store = {}      # {Theme -> DataFrame}
 
 # ---------- 1. LOAD ALL DATASETS ------------------------------
-@st.cache_data
+# @st.cache_data
 def load_all():
     dfs = {}
     for path in glob.glob("data/*.xlsx"):
