@@ -126,7 +126,7 @@ table_key = "data_table"
 
 table = st.data_editor(
     data,
-    hide_index=True,
+    hide_index=False,
     disabled=True,            # read-only
     height=300,
     use_container_width=True,
