@@ -205,11 +205,12 @@ numeric_sel_inds = [
   #  st.stop()
 
 # 3. Perform the aggregation
-plot_df = data.groupby(group)[numeric_sel_inds].agg(func).reset_index()
+# plot_df = data.groupby(group)[numeric_sel_inds].agg(func).reset_index()
 
 
 # plot_df = data.groupby(group)[numeric_sel_inds].agg(func).reset_index()
 
+stat = st.radio("Statistic", ["Mean", "Median"], horizontal=True)
 
 if chart_type in ["Bar", "Radar", "Map", "Funnel"]:
     group = "Country" if countries else "Region"
