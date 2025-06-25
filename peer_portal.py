@@ -120,6 +120,12 @@ data = df.loc[mask, ["Country", "Region", "Income"] + sel_inds].copy()
 
 st.subheader("Filtered table")
 st.dataframe(data, use_container_width=True)
+row_clicked = st.dataframe(data, use_container_width=True).selected_rows
+if row_clicked:
+    url = row_clicked[0].get("SnapshotURL")
+    if url:
+        st.markdown(f"**Policy snapshot:** [{url}]({url})", unsafe_allow_html=True)
+
 
 # download buttons
 csv = data.to_csv(index=False).encode()
