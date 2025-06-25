@@ -251,13 +251,14 @@ elif chart_type == "Map":
 
 # ─── 9. Display chart + click handler ─────────────────────────────────
 st.subheader(f"{chart_type} – {stat}")
-st.plotly_chart(fig, use_container_width=True)
+    # … after you display the chart …
+    st.plotly_chart(fig, use_container_width=True)
 
-events = plotly_events(fig, click_event=True, hover_event=False)
-if events:
-    ev = events[0]
-
-     # try 'x' or 'hovertext' (bar, line, etc.)
+    # ─── Chart click handler ─────────────────────────────────────
+    events = plotly_events(fig, click_event=True, hover_event=False)
+    if events:
+        ev = events[0]
+        # try 'x' or 'hovertext' (bar, line, etc.)
         country_clicked = ev.get("x") or ev.get("hovertext")
 
         # if it’s the Map chart, fallback to ISO3 in 'location'
@@ -279,4 +280,6 @@ if events:
                 )
             else:
                 st.info(f"No snapshot available for {country_clicked}.")
+    # ────────────────────────────────────────────────────────────────
+
 
