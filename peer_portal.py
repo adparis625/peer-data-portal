@@ -185,7 +185,7 @@ elif chart_type == "Map":
         "British Virgin Islands": "VGB",
         "Russian Federation": "RUS",
         "Sao Tome and Principe": "STP",
-        "Saint Kitts and Nevis": "KNA"
+        "Saint Kitts and Nevis": "KNA",
         "Saint Lucia": "LCA",
         "Sint Maarten": "SXM",
         "Saint Martin": "MAF",
