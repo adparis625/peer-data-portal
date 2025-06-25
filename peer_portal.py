@@ -48,17 +48,7 @@ def autoload_from_folder(folder="data"):
 if not st.session_state.store:
     autoload_from_folder()
 
-# group
-# DEBUG: see exactly what columns you have
-st.write("DEBUG columns:", data.columns.tolist())
 
-# Let user pick the grouping column
-group = st.selectbox("Group by", ["Country", "Region", "Income"])
-
-# Now we’re sure this column exists...
-if group not in data.columns:
-    st.error(f"Column '{group}' not found in data")
-    st.stop()
 
 
 # ───────── 3. Sidebar uploader – can add more datasets on the fly ──────────
@@ -133,9 +123,18 @@ if countries:
     mask &= df["Country"].isin(countries)
 data = df.loc[mask, ["Country", "Region", "Income"] + sel_inds].copy()
 
-
 st.subheader("Filtered table")
+# group
+# DEBUG: see exactly what columns you have
+st.write("DEBUG columns:", data.columns.tolist())
 
+# Let user pick the grouping column
+group = st.selectbox("Group by", ["Country", "Region", "Income"])
+
+# Now we’re sure this column exists...
+if group not in data.columns:
+    st.error(f"Column '{group}' not found in data")
+    st.stop()
 table_key = "data_table"
 
 table = st.data_editor(
