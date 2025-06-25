@@ -5,3 +5,4 @@ plotly>=5.20
 altair>=5.2
 openpyxl      # read .xlsx files
 pycountry     # ISO-3 codes for maps
+streamlit-plotly-events 
