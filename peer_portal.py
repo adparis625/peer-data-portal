@@ -197,16 +197,16 @@ numeric_sel_inds = [
     if c in data.columns and pd.api.types.is_numeric_dtype(data[c])
 ]
 
-skipped = [c for c in sel_inds if c not in numeric_sel_inds]
-if skipped:
-    st.info(f"Ignoring non-numeric or missing indicators: {', '.join(skipped)}")
+#skipped = [c for c in sel_inds if c not in numeric_sel_inds]
+#if skipped:
+ #   st.info(f"Ignoring non-numeric or missing indicators: {', '.join(skipped)}")
 
-if not numeric_sel_inds:
-    st.warning("No numeric indicators selected – cannot compute mean/median.")
-    st.stop()
+#if not numeric_sel_inds:
+ #   st.warning("No numeric indicators selected – cannot compute mean/median.")
+  #  st.stop()
 
 # 3. Perform the aggregation
-#plot_df = data.groupby(group)[numeric_sel_inds].agg(func).reset_index()
+plot_df = data.groupby(group)[numeric_sel_inds].agg(func).reset_index()
 
 
 # plot_df = data.groupby(group)[numeric_sel_inds].agg(func).reset_index()
