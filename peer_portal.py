@@ -110,6 +110,8 @@ indicator_cols = [c for c in df.columns
                   if c not in ("Theme", "Country", "Region", "Income")]
 sel_inds = st.multiselect("Indicator(s)", indicator_cols,
                           default=indicator_cols[:1])
+for c in sel_inds:
+    data[c] = pd.to_numeric(data[c], errors="coerce")
 
 stat       = st.radio("Statistic", ["Mean", "Median"], horizontal=True)
 chart_type = st.selectbox("Chart type",
