@@ -110,12 +110,6 @@ indicator_cols = [c for c in df.columns
                   if c not in ("Theme", "Country", "Region", "Income")]
 sel_inds = st.multiselect("Indicator(s)", indicator_cols,
                           default=indicator_cols[:1])
-for c in sel_inds:
-    if c in data.columns:
-        data[c] = pd.to_numeric(data[c], errors="coerce")
-    else:
-        print(f"Column {c} not found in filtered data columns: {list(data.columns)}")
-
 stat       = st.radio("Statistic", ["Mean", "Median"], horizontal=True)
 chart_type = st.selectbox("Chart type",
                           ["Bar", "Line", "Scatter", "Radar", "Funnel", "Map"])
@@ -175,13 +169,32 @@ st.download_button("⬇️ XLSX", xls, "peer_filtered.xlsx",
 
 # ───────── 6. Prepare data for plotting ────────────────────────────────────
 # Filter indicators to only numeric columns for mean/median aggregation
-numeric_sel_inds = [c for c in sel_inds if pd.api.types.is_numeric_dtype(data[c])]
+# 1. Ensure each selected column exists before converting
+for c in sel_inds:
+    if c in data.columns:
+        # coerce strings → NaN, keep numeric as-is
+        data[c] = pd.to_numeric(data[c], errors="coerce")
+    else:
+        # optional: inform the user that one of their selections is missing
+        st.info(f"Ignoring missing column '{c}'")
+
+# 2. Now build the numeric-only list
+numeric_sel_inds = [
+    c for c in sel_inds
+    if c in data.columns and pd.api.types.is_numeric_dtype(data[c])
+]
+
 skipped = [c for c in sel_inds if c not in numeric_sel_inds]
+if skipped:
+    st.info(f"Ignoring non-numeric or missing indicators: {', '.join(skipped)}")
+
 if not numeric_sel_inds:
     st.warning("No numeric indicators selected – cannot compute mean/median.")
     st.stop()
-if skipped:
-    st.info(f"Ignoring non-numeric indicators: {', '.join(skipped)}")
+
+# 3. Perform the aggregation
+plot_df = data.groupby(group)[numeric_sel_inds].agg(func).reset_index()
+
 
 # plot_df = data.groupby(group)[numeric_sel_inds].agg(func).reset_index()
 
