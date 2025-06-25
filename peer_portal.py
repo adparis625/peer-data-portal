@@ -262,8 +262,20 @@ elif chart_type == "Map":
 else:
     st.info("Select ≥2 indicators for Scatter/Radar.")
     st.stop()
-st.plotly_chart(fig, use_container_width=True)
-event = spe.plotly_events(fig, click_event=True, hover_event=False)
+    
+    
+# capture clicks
+events = plotly_events(fig)
+if events:
+    # for bar / map charts: x is country label
+    clicked_country = events[0].get("x") or events[0].get("hovertext")
+    url_series = data.loc[data["Country"] == clicked_country, "SnapshotURL"].dropna()
+    if not url_series.empty:
+        url = url_series.iat[0]
+        st.markdown(f"**Policy snapshot:** [{url}]({url})", unsafe_allow_html=True)
+    st.plotly_chart(fig, use_container_width=True)
+
+
 
 
 fig.update_layout(height=560, margin=dict(l=20, r=20, t=40, b=10))
