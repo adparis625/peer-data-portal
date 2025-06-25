@@ -2,14 +2,14 @@ import io, os, numpy as np, pandas as pd, streamlit as st, plotly.express as px
 # import plotly.graph_objects as go
 import pycountry
 
-st.set_page_config(page_title="PEER Data Portal", layout="wide")
-
+if "store" not in st.session_state or not isinstance(st.session_state.store, dict):
+    st.session_state.store = {} 
 ##############################################################################
 # 1) SESSION STATE: store uploaded datasets across app interactions
 ##############################################################################
-if "store" not in st.session_state:
-    st.session_state.store = {}      # {Theme -> DataFrame}
+     # {Theme -> DataFrame}
  
+st.set_page_config(page_title="PEER Data Portal", layout="wide")
 
 ##############################################################################
 # 2) UPLOAD AREA (left sidebar, visible to all)
