@@ -5,6 +5,7 @@ import pandas as pd
 import streamlit as st
 import plotly.express as px
 import pycountry
+import streamlit_plotly_events as spe
 
 st.set_page_config(page_title="PEER Data Portal", layout="wide")
 
@@ -176,6 +177,17 @@ elif chart_type == "Map":
 else:
     st.info("Select ≥2 indicators for Scatter/Radar.")
     st.stop()
+st.plotly_chart(fig, use_container_width=True)
+event = spe.plotly_events(fig, click_event=True, hover_event=False)
+
+if event:
+    point = event[0]
+    # Determine which country was clicked
+    country_clicked = point.get("x") or point.get("hovertext")
+    snap_row = data[data["Country"] == country_clicked]
+    if not snap_row.empty and snap_row["SnapshotURL"].iloc[0]:
+        url = snap_row["SnapshotURL"].iloc[0]
+        st.markdown(f"**Policy snapshot:** [{url}]({url})", unsafe_allow_html=True)
 
 fig.update_layout(height=560, margin=dict(l=20, r=20, t=40, b=10))
 st.subheader(f"{chart_type} – {stat}")
