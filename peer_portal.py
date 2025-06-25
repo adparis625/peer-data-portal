@@ -119,7 +119,6 @@ if countries:
     mask &= df["Country"].isin(countries)
 data = df.loc[mask, ["Country", "Region", "Income"] + sel_inds].copy()
 
-st.subheader("Filtered table")
 
 st.subheader("Filtered table")
 
