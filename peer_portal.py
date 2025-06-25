@@ -193,7 +193,34 @@ if not numeric_sel_inds:
     st.stop()
 
 # 3. Perform the aggregation
-plot_df = data.groupby(group)[numeric_sel_inds].agg(func).reset_index()
+#plot_df = data.groupby(group)[numeric_sel_inds].agg(func).reset_index()
+# ─── Sanity checks before aggregation ──────────────────────────────────
+# 1. Ensure the grouping column exists
+if group not in data.columns:
+    st.error(f"Cannot group by '{group}': column not in the data.")
+    st.stop()
+
+# 2. Ensure at least one valid numeric indicator
+if not numeric_sel_inds:
+    st.warning("No numeric indicators to aggregate. Please select at least one numeric column.")
+    st.stop()
+
+# 3. Make absolutely sure all indicators exist in the filtered data
+missing = [c for c in numeric_sel_inds if c not in data.columns]
+if missing:
+    st.error(f"The following indicators are missing from the data and cannot be plotted: {', '.join(missing)}")
+    st.stop()
+
+# ─── Do the aggregation inside a try/except ───────────────────────────
+try:
+    plot_df = (
+        data
+        .groupby(group, as_index=False)[numeric_sel_inds]
+        .agg(func)
+    )
+except Exception as e:
+    st.error(f"Unexpected error during aggregation:\n\n{e}")
+    st.stop()
 
 
 # plot_df = data.groupby(group)[numeric_sel_inds].agg(func).reset_index()
