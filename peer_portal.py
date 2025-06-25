@@ -257,26 +257,26 @@ events = plotly_events(fig, click_event=True, hover_event=False)
 if events:
     ev = events[0]
 
-     # first try x/hovertext (bar, line, etc.)
-    country_clicked = ev.get("x") or ev.get("hovertext") 
-    #or ev.get("location")
-  
-        # if it’s the Map chart, fall back to ISO code in 'location' 
-   if chart_type == "Map" and not country_clicked:
+     # try 'x' or 'hovertext' (bar, line, etc.)
+        country_clicked = ev.get("x") or ev.get("hovertext")
+
+        # if it’s the Map chart, fallback to ISO3 in 'location'
+        if chart_type == "Map" and not country_clicked:
             iso_clicked = ev.get("location")
             match = plot_df[plot_df["iso"] == iso_clicked]
             if not match.empty:
                 country_clicked = match["Country"].iat[0]
 
- # now show the snapshot URL if present
-    if country_clicked:
-        snap = data.loc[
-        data["Country"] == country_clicked, "SnapshotURL"
-        ].dropna()
-        if not snap.empty:
-            st.markdown(
-                f"**Policy snapshot for {country_clicked}:** "
-                        f"[Open link]({snap.iat[0]})")
-         else:
+        # now show the snapshot URL if we have a country
+        if country_clicked:
+            snap = data.loc[
+                data["Country"] == country_clicked, "SnapshotURL"
+            ].dropna()
+            if not snap.empty:
+                st.markdown(
+                    f"**Policy snapshot for {country_clicked}:** "
+                    f"[Open link]({snap.iat[0]})"
+                )
+            else:
                 st.info(f"No snapshot available for {country_clicked}.")
 
