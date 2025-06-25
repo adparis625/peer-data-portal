@@ -1,321 +1,213 @@
-# peer_portal.py  ───────────────────────────────────────────────────────────
+# peer_portal.py
+
 import io, os, glob
 import numpy as np
 import pandas as pd
 import streamlit as st
 import plotly.express as px
 import pycountry
-import streamlit_plotly_events as spe
 from streamlit_plotly_events import plotly_events
-
 
 st.set_page_config(page_title="PEER Data Portal", layout="wide")
 
-# ───────── 1. Make sure the central store exists on every rerun ────────────
+# ─── 1. Ensure the session‐store exists ─────────────────────────────
 if "store" not in st.session_state or not isinstance(st.session_state.store, dict):
-    st.session_state.store = {}                 # { "Theme" : DataFrame }
+    st.session_state.store = {}
 
-# ───────── 2. Automatic load from ./data once per session ──────────────────
-def autoload_from_folder(folder="data"):
-    patterns = glob.glob(os.path.join(folder, "*.xlsx")) + \
-               glob.glob(os.path.join(folder, "*.csv"))
-    for path in patterns:
+# ─── 2. Auto‐load from data/ on first run ───────────────────────────
+def autoload():
+    pats = glob.glob("data/*.xlsx") + glob.glob("data/*.csv")
+    for path in pats:
         try:
-            df = pd.read_excel(path) if path.endswith(".xlsx") else pd.read_csv(path)
-        except Exception as exc:
-            st.warning(f"❌ Could not read {os.path.basename(path)}: {exc}")
+            df0 = pd.read_excel(path) if path.endswith(".xlsx") else pd.read_csv(path)
+        except Exception as e:
+            st.warning(f"Could not read {path}: {e}")
             continue
 
-        # Yes/No → 1/0
-        for col in df.columns:
-            if df[col].dropna().isin(["Yes", "No"]).all():
-                df[col] = df[col].map({"Yes": 1, "No": 0})
+        # Recode Yes/No → 1/0
+        for col in df0.columns:
+            if df0[col].dropna().isin(["Yes", "No"]).all():
+                df0[col] = df0[col].map({"Yes":1,"No":0})
 
-        # Theme column optional – fallback to filename
-        if "Theme" not in df.columns:
-            df["Theme"] = os.path.basename(path).rsplit(".", 1)[0]
+        # Ensure Theme column
+        if "Theme" not in df0.columns:
+            df0["Theme"] = os.path.basename(path).rsplit(".",1)[0]
 
-        # merge into store (one DataFrame per theme)
-        for theme_raw in df["Theme"].unique():
-            theme = str(theme_raw)    # ensure key is str
-            part  = df[df["Theme"] == theme_raw].copy()
-            st.session_state.store[theme] = (
-                pd.concat([st.session_state.store.get(theme, pd.DataFrame()), part])
-                .reset_index(drop=True)
+        # Merge into store by theme
+        for raw in df0["Theme"].unique():
+            theme = str(raw)
+            part  = df0[df0["Theme"]==raw].copy()
+            st.session_state.store[theme] = pd.concat(
+                [st.session_state.store.get(theme, pd.DataFrame()), part],
+                ignore_index=True
             )
 
-# run only once (first page load)
 if not st.session_state.store:
-    autoload_from_folder()
+    autoload()
 
-
-
-
-# ───────── 3. Sidebar uploader – can add more datasets on the fly ──────────
+# ─── 3. Sidebar uploader ─────────────────────────────────────────────
 with st.sidebar:
-    st.header("⬆️  Upload dataset(s)")
-    uploads = st.file_uploader(
-        "Drop Excel or CSV (needs Theme | Country | Region | Income columns)",
-        accept_multiple_files=True, type=["xlsx", "csv"]
-    )
-    if st.button("Add to portal") and uploads:
-        for f in uploads:
+    st.header("⬆️ Upload dataset(s)")
+    ups = st.file_uploader("Drop Excel/CSV (needs Theme|Country|Region|Income)",
+                            accept_multiple_files=True, type=["xlsx","csv"])
+    if st.button("Add to portal") and ups:
+        for f in ups:
             try:
-                df = pd.read_excel(f) if f.name.endswith(".xlsx") else pd.read_csv(f)
-            except Exception as exc:
-                st.error(f"Could not load {f.name}: {exc}")
+                df1 = pd.read_excel(f) if f.name.endswith(".xlsx") else pd.read_csv(f)
+            except Exception as e:
+                st.error(f"Failed to load {f.name}: {e}")
                 continue
 
-            for col in df.columns:
-                if df[col].dropna().isin(["Yes", "No"]).all():
-                    df[col] = df[col].map({"Yes": 1, "No": 0})
+            # Yes/No → 1/0
+            for col in df1.columns:
+                if df1[col].dropna().isin(["Yes","No"]).all():
+                    df1[col] = df1[col].map({"Yes":1,"No":0})
 
-            if "Theme" not in df.columns:
-                df["Theme"] = f.name.rsplit(".", 1)[0]
+            if "Theme" not in df1.columns:
+                df1["Theme"] = f.name.rsplit(".",1)[0]
 
-            for theme_raw in df["Theme"].unique():
-                theme = str(theme_raw)
-                part  = df[df["Theme"] == theme_raw].copy()
-                st.session_state.store[theme] = (
-                    pd.concat([st.session_state.store.get(theme, pd.DataFrame()), part])
-                    .reset_index(drop=True)
+            for raw in df1["Theme"].unique():
+                theme = str(raw)
+                part  = df1[df1["Theme"]==raw].copy()
+                st.session_state.store[theme] = pd.concat(
+                    [st.session_state.store.get(theme, pd.DataFrame()), part],
+                    ignore_index=True
                 )
         st.success("Datasets added!")
 
-# ───────── 4. Main interface ───────────────────────────────────────────────
+# ─── 4. Main UI ───────────────────────────────────────────────────────
 st.title("PEER Interactive Data Portal")
-
 if not st.session_state.store:
-    st.info("No datasets yet – upload in the sidebar or place files in /data.")
+    st.info("No data. Upload via sidebar or place files in data/")
     st.stop()
 
-themes = sorted(map(str, st.session_state.store.keys()))
-theme  = st.selectbox("Theme", themes)
-df     = st.session_state.store[theme]
+# Theme selector
+theme = st.selectbox("Theme", sorted(st.session_state.store.keys()))
+df    = st.session_state.store[theme]
 
-regions = st.multiselect(
-    "Region(s)",
-    sorted(df["Region"].dropna().unique()),
-    default=sorted(df["Region"].dropna().unique())
-)
-incomes = st.multiselect(
-    "Income group(s)",
-    sorted(df["Income"].dropna().unique()),
-    default=sorted(df["Income"].dropna().unique())
-)
-countries = st.multiselect(
-    "Country(ies)",
-    sorted(df[df["Region"].isin(regions)]["Country"].unique()),
-    default=[]
-)
+# Filters
+regions   = st.multiselect("Region(s)", sorted(df["Region"].dropna().unique()),
+                            default=sorted(df["Region"].dropna().unique()))
+incomes   = st.multiselect("Income group(s)", sorted(df["Income"].dropna().unique()),
+                            default=sorted(df["Income"].dropna().unique()))
+countries = st.multiselect("Country(ies)",
+                   sorted(df[df["Region"].isin(regions)]["Country"].unique()))
 
-indicator_cols = [c for c in df.columns
-                  if c not in ("Theme", "Country", "Region", "Income")]
-sel_inds = st.multiselect("Indicator(s)", indicator_cols,
-                          default=indicator_cols[:1])
-stat       = st.radio("Statistic", ["Mean", "Median"], horizontal=True)
+# Indicator selection
+ind_cols = [c for c in df.columns if c not in ("Theme","Country","Region","Income")]
+sel_inds = st.multiselect("Indicator(s)", ind_cols, default=ind_cols[:1])
+
+# Statistic choice → bind func
+stat = st.radio("Statistic", ["Mean","Median"], horizontal=True)
+func = np.mean if stat=="Mean" else np.median
+
+# Chart type
 chart_type = st.selectbox("Chart type",
-                          ["Bar", "Line", "Scatter", "Radar", "Funnel", "Map"])
+    ["Bar","Line","Scatter","Radar","Funnel","Map"])
 
-# ───────── 5. Filter dataset ───────────────────────────────────────────────
+# ─── 5. Filter the DataFrame ───────────────────────────────────────────
 mask = df["Region"].isin(regions) & df["Income"].isin(incomes)
 if countries:
     mask &= df["Country"].isin(countries)
-data = df.loc[mask, ["Country", "Region", "Income"] + sel_inds].copy()
+data = df.loc[mask, ["Country","Region","Income"] + sel_inds].copy()
 
 st.subheader("Filtered table")
-# group
-# DEBUG: see exactly what columns you have
-st.write("DEBUG columns:", data.columns.tolist())
-
-# Let user pick the grouping column
-group = st.selectbox("Group by", ["Country", "Region", "Income"])
-
-# Now we’re sure this column exists...
-if group not in data.columns:
-    st.error(f"Column '{group}' not found in data")
-    st.stop()
-table_key = "data_table"
-
 table = st.data_editor(
-    data,
-    hide_index=False,
-    disabled=True,            # read-only
-    height=300,
-    use_container_width=True,
-    key=table_key
+    data, hide_index=False, row_selection="single",
+    height=300, use_container_width=True, key="tbl"
 )
 
-# grab the selection only if the key already exists in session_state
-rows = st.session_state.get(table_key, {}).get("selected_rows", [])
-if rows:
-    idx = rows[0]                             # first selected row index
+# Row‐click → show snapshot link
+sel = st.session_state.get("tbl",{}).get("selected_rows",[])
+if sel:
+    idx = sel[0]["_index"] if isinstance(sel[0],dict) else sel[0]
     url = data.iloc[idx].get("SnapshotURL")
     if url:
-        st.markdown(
-            f"**Policy snapshot:** [{url}]({url})",
-            unsafe_allow_html=True
-        )
+        st.markdown(f"**Policy snapshot:** [{url}]({url})")
 
-# read selected row indices safely
-selected = st.session_state.get(table_key, {}).get("selected_rows", [])
-if selected:
-    # data_editor returns a list of dicts -> get the first item's row number
-    row_num = selected[0]["_index"] if isinstance(selected[0], dict) else selected[0]
-    url = data.iloc[row_num].get("SnapshotURL")
-    if pd.notna(url) and url != "":
-        st.markdown(f"**Policy snapshot:** [{url}]({url})",
-                    unsafe_allow_html=True)
-    else:
-        st.info("No snapshot link for this country.")
-else:
-    st.caption("ℹ️ Click the grey row-number to open that country’s snapshot")
-
-# download buttons
+# Download buttons
 csv = data.to_csv(index=False).encode()
-xls = io.BytesIO(); data.to_excel(xls, index=False); xls.seek(0)
-st.download_button("⬇️ CSV", csv, "peer_filtered.csv", "text/csv", key="csv_dl")
-st.download_button("⬇️ XLSX", xls, "peer_filtered.xlsx",
-                   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                   key="xlsx_dl")
+xlsb= io.BytesIO(); data.to_excel(xlsb,index=False); xlsb.seek(0)
+st.download_button("Download CSV", csv, "data.csv","text/csv")
+st.download_button("Download XLSX", xlsb,"data.xlsx",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-# ───────── 6. Prepare data for plotting ────────────────────────────────────
-# Filter indicators to only numeric columns for mean/median aggregation
-# 1. Ensure each selected column exists before converting
+# ─── 6. Prepare for plotting ────────────────────────────────────────────
+# Convert selected columns to numeric
 for c in sel_inds:
     if c in data.columns:
-        # coerce strings → NaN, keep numeric as-is
-        data[c] = pd.to_numeric(data[c], errors="coerce")
-    else:
-        # optional: inform the user that one of their selections is missing
-        st.info(f"Ignoring missing column '{c}'")
+        data[c] = pd.to_numeric(data[c],errors="coerce")
 
-# 2. Now build the numeric-only list
-numeric_sel_inds = [
-    c for c in sel_inds
-    if c in data.columns and pd.api.types.is_numeric_dtype(data[c])
-]
+# Keep only numeric indicators
+numeric_sel = [c for c in sel_inds if pd.api.types.is_numeric_dtype(data[c])]
+if not numeric_sel:
+    st.warning("Select at least one numeric indicator.")
+    st.stop()
 
-#skipped = [c for c in sel_inds if c not in numeric_sel_inds]
-#if skipped:
- #   st.info(f"Ignoring non-numeric or missing indicators: {', '.join(skipped)}")
+# Let user pick grouping
+group = st.selectbox("Group by", ["Country","Region","Income"])
+if group not in data.columns:
+    st.error(f"No column '{group}' in data.")
+    st.stop()
 
-#if not numeric_sel_inds:
- #   st.warning("No numeric indicators selected – cannot compute mean/median.")
-  #  st.stop()
-
-# 3. Perform the aggregation
-# plot_df = data.groupby(group)[numeric_sel_inds].agg(func).reset_index()
-
-
-# plot_df = data.groupby(group)[numeric_sel_inds].agg(func).reset_index()
-
-stat = st.radio("Statistic", ["Mean", "Median"], horizontal=True)
-
-if chart_type in ["Bar", "Radar", "Map", "Funnel"]:
-    group = "Country" if countries else "Region"
-    func  = np.mean if stat == "Mean" else np.median
-    plot_df = data.groupby(group)[numeric_sel_inds].agg(func).reset_index()
-
+# Aggregate if needed
+if chart_type in ["Bar","Radar","Map","Funnel"]:
+    plot_df = data.groupby(group,as_index=False)[numeric_sel].agg(func)
 else:
     plot_df = data.copy()
 
-if plot_df.empty or not sel_inds:
-    st.warning("No data/indicators selected.")
+# ─── 7. Build the chart ────────────────────────────────────────────────
+if plot_df.empty:
+    st.warning("No data to plot.")
     st.stop()
 
-
-# ───────── 7. Build chart with Plotly ──────────────────────────────────────
 if chart_type == "Bar":
-    fig = px.bar(plot_df, x=plot_df.columns[0], y=sel_inds, barmode="group")
+    fig = px.bar(plot_df, x=group, y=numeric_sel, barmode="group")
 elif chart_type == "Line":
-    fig = px.line(plot_df, x=plot_df.columns[0], y=sel_inds)
-elif chart_type == "Scatter" and len(sel_inds) >= 2:
-    fig = px.scatter(plot_df, x=sel_inds[0], y=sel_inds[1],
-                     color="Region", hover_name="Country")
-elif chart_type == "Radar" and len(sel_inds) >= 2:
-    fig = px.line_polar(plot_df.melt(id_vars=plot_df.columns[0]),
-                        r="value", theta="variable",
-                        color=plot_df.columns[0], line_close=True)
+    fig = px.line(plot_df, x=group, y=numeric_sel)
+elif chart_type == "Scatter" and len(numeric_sel)>=2:
+    fig = px.scatter(plot_df, x=numeric_sel[0], y=numeric_sel[1],
+                     color=group, hover_name=group)
+elif chart_type == "Radar" and len(numeric_sel)>=2:
+    long = plot_df.melt(id_vars=group, value_vars=numeric_sel)
+    fig = px.line_polar(long, r="value", theta="variable",
+                        color=group,line_close=True)
 elif chart_type == "Funnel":
-    funnel = plot_df[sel_inds].sum().reset_index()
-    funnel.columns = ["Stage", "Value"]
-    fig = px.funnel(funnel, x="Value", y="Stage")
+    fun = plot_df[numeric_sel].sum().reset_index()
+    fun.columns=["Stage","Value"]
+    fig = px.funnel(fun, x="Value", y="Stage")
 elif chart_type == "Map":
-    ind = sel_inds[0]
-
-    # ----------------  ISO-3 lookup  ----------------
-    overrides = {"Cabo Verde": "CPV", "South Sudan": "SSD"}   # add any tricky names
-    def iso3(name):
-        if name in overrides:
-            return overrides[name]
-        try:
-            return pycountry.countries.lookup(name).alpha_3
-        except Exception:
-            return None
-
-    plot_df["iso"] = plot_df[plot_df.columns[0]].apply(iso3)
-
-    # ----------------  999 → NaN  -------------------
-    plot_df.loc[plot_df[ind] == 999, ind] = np.nan   # <- key line
-
-    # numeric coercion just in case
-    plot_df[ind] = pd.to_numeric(plot_df[ind], errors="ignore")
-
-    # keep only rows with both ISO and real value
-    plot_df = plot_df.dropna(subset=["iso", ind])
-
-    if plot_df.empty:
-        st.warning("No mappable data for this filter / indicator.")
-        st.stop()
-
-    # decide scale type
-    uniq = plot_df[ind].dropna().unique()
-    if plot_df[ind].dtype.kind in "fi" and len(uniq) > 10:
-        # continuous
-        fig = px.choropleth(
-            plot_df, locations="iso", color=ind,
-            hover_name=plot_df.columns[0],
-            color_continuous_scale="Blues",
-            title=f"{stat} of {ind}"
-        )
+    ind = numeric_sel[0]
+    # treat 999 as nan
+    plot_df = plot_df.assign(**{ind: lambda d: d[ind].replace(999, np.nan)})
+    # iso lookup
+    plot_df["iso"] = plot_df[group].apply(
+        lambda n: pycountry.countries.lookup(n).alpha_3 if pd.notna(n) else None
+    )
+    plot_df = plot_df.dropna(subset=["iso",ind])
+    # switch scale
+    vals = plot_df[ind].dropna().unique()
+    if len(vals)>10:
+        fig = px.choropleth(plot_df, locations="iso", color=ind,
+                            color_continuous_scale="Blues")
     else:
-        # categorical
-        plot_df["cat"] = plot_df[ind].astype(str)
-        palette = px.colors.qualitative.Safe
-        color_map = {c: palette[i % len(palette)]
-                     for i, c in enumerate(sorted(plot_df["cat"].unique()))}
-
-        fig = px.choropleth(
-            plot_df, locations="iso", color="cat",
-            hover_name=plot_df.columns[0],
-            color_discrete_map=color_map,
-            title=f"{ind} categories"
-        )
-        fig.update_layout(coloraxis_colorbar=None)
-
-    fig.update_layout(height=560, margin=dict(l=20, r=20, t=40, b=10))
-
-
+        plot_df["cat"]=plot_df[ind].astype(str)
+        cmap = {v: px.colors.qualitative.Safe[i]
+                for i,v in enumerate(sorted(plot_df["cat"].unique()))}
+        fig = px.choropleth(plot_df, locations="iso", color="cat",
+                            color_discrete_map=cmap)
 else:
-    st.info("Select ≥2 indicators for Scatter/Radar.")
+    st.info("Select at least two indicators for Scatter/Radar.")
     st.stop()
-    
-    
-# capture clicks
-events = plotly_events(fig)
-if events:
-    # for bar / map charts: x is country label
-    clicked_country = events[0].get("x") or events[0].get("hovertext")
-    url_series = data.loc[data["Country"] == clicked_country, "SnapshotURL"].dropna()
-    if not url_series.empty:
-        url = url_series.iat[0]
-        st.markdown(f"**Policy snapshot:** [{url}]({url})", unsafe_allow_html=True)
-    st.plotly_chart(fig, use_container_width=True)
 
-
-
-
-fig.update_layout(height=560, margin=dict(l=20, r=20, t=40, b=10))
+fig.update_layout(margin=dict(l=20,r=20,t=40,b=20),height=550)
 st.subheader(f"{chart_type} – {stat}")
 st.plotly_chart(fig, use_container_width=True)
+
+# Chart click → snapshot link
+events = plotly_events(fig, click_event=True)
+if events:
+    country = events[0].get("x") or events[0].get("hovertext")
+    snap = data.loc[data["Country"]==country,"SnapshotURL"].dropna()
+    if not snap.empty:
+        st.markdown(f"**Policy snapshot:** [{snap.iat[0]}]({snap.iat[0]})")
