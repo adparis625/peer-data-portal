@@ -82,7 +82,7 @@ with st.sidebar:
                 if df[col].dropna().isin(["Yes", "No"]).all():
                     df[col] = df[col].map({"Yes": 1, "No": 0})
             # append to store by Theme value(s)
-            for theme in df["Theme"].unique():
+           themes = sorted(map(str, st.session_state.store.keys()))
                 part = df[df["Theme"] == theme].copy()
                 st.session_state.store[theme] = (
                     pd.concat([st.session_state.store.get(theme, pd.DataFrame()), part])
