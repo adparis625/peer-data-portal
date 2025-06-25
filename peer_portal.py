@@ -9,22 +9,8 @@ st.set_page_config(page_title="PEER Data Portal", layout="wide")
 ##############################################################################
 if "store" not in st.session_state:
     st.session_state.store = {}      # {Theme -> DataFrame}
-
-# ---------- 1. LOAD ALL DATASETS ------------------------------
-# @st.cache_data
-def load_all():
-    dfs = {}
-    for path in glob.glob("data/*.xlsx"):
-        name = path.split("/")[-1].replace(".xlsx", "")
-        df = pd.read_excel(path)
-        # recode Yes/No -> 1/0
-        for col in df:
-            if df[col].dropna().isin(["Yes", "No"]).all():
-                df[col] = df[col].map({"Yes": 1, "No": 0})
-        dfs[name] = df
-    return dfs
-datasets = load_all()
-
+for path in glob.glob("data/*.xlsx"):
+    
 
 ##############################################################################
 # 2) UPLOAD AREA (left sidebar, visible to all)
