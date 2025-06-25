@@ -186,7 +186,7 @@ elif chart_type == "Map":
     plot_df["iso"] = plot_df[group].apply(to_iso3)
     
     plot_df = plot_df.dropna(subset=["iso", ind])
-     3) Drop rows missing either iso or value
+   #  3) Drop rows missing either iso or value
     plot_df = plot_df.dropna(subset=["iso", ind])
     if plot_df.empty:
         st.warning("No mappable data for this filter / indicator.")
