@@ -171,6 +171,33 @@ elif chart_type == "Map":
     iso_overrides = {
         "Cabo Verde": "CPV",
         "South Sudan": "SSD",
+        "Antigua and Barbuda": "ATG",
+        "Bosnia and Herzegovina": "BIH",
+        "Brunei Darussalam": "BRN",
+        "Central African Republic ": "CAF",
+        "Democratic Republic of the Congo": "COD",
+        "Equatorial Guniea": "GNQ",
+        "Côte d'Ivoire": "CIV",
+        "Dominican Republic": "DOM",
+        "Syrian Arab Republic": "SYR",
+        "United Arab Emirates": "UAE",
+        "Saudi Arabia": "SAU",
+        "British Virgin Islands": "VGB",
+        "Russian Federation": "RUS",
+        "Sao Tome and Principe": "STP",
+        "Saint Kitts and Nevis": "KNA"
+        "Saint Lucia": "LCA",
+        "Sint Maarten": "SXM",
+        "Saint Martin": "MAF",
+        "San Marino": "SMR",
+        "Sierra Lene": "SLE",
+        "North Macedonia": "MKD",
+        "Korea, Democratic People's Republic of": "PRK",
+        "Korea, Republic of (South Korea)": "KOR",
+        "United States": "USA",
+        "Cook Islands": "COK",
+        "United Kingdom": "GBR",
+     
         # add more manual fixes here if needed
     }
     def to_iso3(name):
