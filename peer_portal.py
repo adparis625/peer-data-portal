@@ -83,11 +83,9 @@ if not st.session_state.store:
     st.info("No data available. Upload via sidebar or place files in /data.")
     st.stop()
 
-# Theme selector
 theme = st.selectbox("Theme", sorted(st.session_state.store.keys()))
 df    = st.session_state.store[theme]
 
-# Filters
 regions   = st.multiselect("Region(s)", sorted(df["Region"].dropna().unique()),
                             default=sorted(df["Region"].dropna().unique()))
 incomes   = st.multiselect("Income group(s)", sorted(df["Income"].dropna().unique()),
@@ -95,20 +93,17 @@ incomes   = st.multiselect("Income group(s)", sorted(df["Income"].dropna().uniqu
 countries = st.multiselect("Country(ies)",
                sorted(df[df["Region"].isin(regions)]["Country"].unique()))
 
-# Indicator selection
 ind_cols = [c for c in df.columns if c not in ("Theme", "Country", "Region", "Income")]
 sel_inds = st.multiselect("Indicator(s)", ind_cols, default=ind_cols[:1])
 
-# Statistic choice → bind func
 stat = st.radio("Statistic", ["Mean", "Median"], horizontal=True)
 func = np.mean if stat == "Mean" else np.median
 
-# Chart type
 chart_type = st.selectbox("Chart type",
     ["Bar", "Line", "Scatter", "Radar", "Funnel", "Map"]
 )
 
-# ─── 5. Filter the DataFrame ───────────────────────────────────────────
+# ─── 5. Filter DataFrame ─────────────────────────────────────────────
 mask = df["Region"].isin(regions) & df["Income"].isin(incomes)
 if countries:
     mask &= df["Country"].isin(countries)
@@ -117,32 +112,32 @@ data = df.loc[mask, ["Country", "Region", "Income"] + sel_inds].copy()
 st.subheader("Filtered table")
 st.dataframe(data, use_container_width=True)
 
-# ─── 6. Download buttons ───────────────────────────────────────────────
+# ─── 6. Download ─────────────────────────────────────────────────────
 csv = data.to_csv(index=False).encode()
 xlsb = io.BytesIO(); data.to_excel(xlsb, index=False); xlsb.seek(0)
 st.download_button("⬇️ Download CSV", csv, "data.csv", "text/csv")
 st.download_button("⬇️ Download XLSX", xlsb, "data.xlsx",
                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-# ─── 7. Prepare for plotting ────────────────────────────────────────────
-# Convert selected columns to numeric
+# ─── 7. Prepare for plotting ─────────────────────────────────────────
 for c in sel_inds:
     if c in data.columns:
         data[c] = pd.to_numeric(data[c], errors="coerce")
 
-# Keep only numeric indicators
 numeric_sel = [c for c in sel_inds if pd.api.types.is_numeric_dtype(data[c])]
 if not numeric_sel:
     st.warning("Select at least one numeric indicator to plot.")
     st.stop()
 
-# Let user pick grouping
-group = st.selectbox("Group by", ["Country", "Region", "Income"])
-if group not in data.columns:
-    st.error(f"Column '{group}' not found.")
-    st.stop()
+# For Map, force grouping by Country
+if chart_type == "Map":
+    group = "Country"
+else:
+    group = st.selectbox("Group by", ["Country", "Region", "Income"])
+    if group not in data.columns:
+        st.error(f"Column '{group}' not found.")
+        st.stop()
 
-# Aggregate if needed
 if chart_type in ["Bar", "Radar", "Map", "Funnel"]:
     plot_df = data.groupby(group, as_index=False)[numeric_sel].agg(func)
 else:
@@ -152,7 +147,7 @@ if plot_df.empty:
     st.warning("No data to plot.")
     st.stop()
 
-# ─── 8. Build the chart ────────────────────────────────────────────────
+# ─── 8. Build chart ───────────────────────────────────────────────────
 if chart_type == "Bar":
     fig = px.bar(plot_df, x=group, y=numeric_sel, barmode="group")
 elif chart_type == "Line":
@@ -173,27 +168,27 @@ elif chart_type == "Map":
     # Treat 999 as NaN
     plot_df.loc[plot_df[ind] == 999, ind] = np.nan
     # ISO lookup
-    plot_df["iso"] = plot_df[group].apply(
+    plot_df["iso"] = plot_df["Country"].apply(
         lambda x: pycountry.countries.lookup(x).alpha_3 if pd.notna(x) else None
     )
     plot_df = plot_df.dropna(subset=["iso", ind])
     vals = plot_df[ind].dropna().unique()
     if len(vals) > 10:
         fig = px.choropleth(plot_df, locations="iso", color=ind,
-                            color_continuous_scale="Blues")
+                            hover_name="Country", color_continuous_scale="Blues")
     else:
         plot_df["cat"] = plot_df[ind].astype(str)
         cmap = {v: px.colors.qualitative.Safe[i % len(px.colors.qualitative.Safe)]
                 for i, v in enumerate(sorted(plot_df["cat"].unique()))}
         fig = px.choropleth(plot_df, locations="iso", color="cat",
-                            color_discrete_map=cmap)
+                            hover_name="Country", color_discrete_map=cmap)
 else:
     st.info("Select at least two indicators for Scatter/Radar.")
     st.stop()
 
 fig.update_layout(margin=dict(l=20, r=20, t=40, b=20), height=550)
 
-# ─── 9. Display chart and capture clicks ───────────────────────────────
+# ─── 9. Display chart + click handler ─────────────────────────────────
 st.subheader(f"{chart_type} – {stat}")
 st.plotly_chart(fig, use_container_width=True)
 
