@@ -122,26 +122,25 @@ data = df.loc[mask, ["Country", "Region", "Income"] + sel_inds].copy()
 
 st.subheader("Filtered table")
 
-# 1  display the table (read-only) with a widget key
+table_key = "data_table"
+
 table = st.data_editor(
     data,
     hide_index=True,
-    disabled=True,
+    disabled=True,            # read-only
     height=300,
     use_container_width=True,
-    key="data_table"          # ← important
+    key=table_key
 )
 
-# 2  get the list of selected row indices
-rows = st.session_state["data_table"]["selected_rows"]   # ← use the key
+# grab the selection only if the key already exists in session_state
+rows = st.session_state.get(table_key, {}).get("selected_rows", [])
 if rows:
-    # rows is a list of row numbers; take the first one
-    idx = rows[0]
-    snap_url = data.iloc[idx].get("SnapshotURL")
-    if snap_url:
+    idx = rows[0]                             # first selected row index
+    url = data.iloc[idx].get("SnapshotURL")
+    if url:
         st.markdown(
-            f"**Policy snapshot:** "
-            f"[{snap_url}]({snap_url})",
+            f"**Policy snapshot:** [{url}]({url})",
             unsafe_allow_html=True
         )
 
