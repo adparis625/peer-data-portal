@@ -111,7 +111,10 @@ indicator_cols = [c for c in df.columns
 sel_inds = st.multiselect("Indicator(s)", indicator_cols,
                           default=indicator_cols[:1])
 for c in sel_inds:
-    data[c] = pd.to_numeric(data[c], errors="coerce")
+    if c in data.columns:
+        data[c] = pd.to_numeric(data[c], errors="coerce")
+    else:
+        print(f"Column {c} not found in filtered data columns: {list(data.columns)}")
 
 stat       = st.radio("Statistic", ["Mean", "Median"], horizontal=True)
 chart_type = st.selectbox("Chart type",
