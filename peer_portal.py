@@ -2,13 +2,62 @@ import io, os, numpy as np, pandas as pd, streamlit as st, plotly.express as px
 # import plotly.graph_objects as go
 import pycountry
 
-if "store" not in st.session_state or not isinstance(st.session_state.store, dict):
-    st.session_state.store = {} 
 ##############################################################################
 # 1) SESSION STATE: store uploaded datasets across app interactions
 ##############################################################################
      # {Theme -> DataFrame}
  
+if "store" not in st.session_state or not isinstance(st.session_state.store, dict):
+    st.session_state.store = {} 
+
+
+# ────────────────────────────────────────────────────────────────
+# 2. OPTIONAL: auto-load every .xlsx / .csv in a data/ folder ONCE
+# ────────────────────────────────────────────────────────────────
+def autoload_from_folder(folder="data"):
+    for path in glob.glob(os.path.join(folder, "*.xlsx")) + \
+               glob.glob(os.path.join(folder, "*.csv")):
+        try:
+            df = pd.read_excel(path) if path.endswith(".xlsx") else pd.read_csv(path)
+        except Exception as e:
+            st.warning(f"Could not read {os.path.basename(path)}: {e}")
+            continue
+        # recode Yes/No → 1/0
+        for col in df:
+            if df[col].dropna().isin(["Yes", "No"]).all():
+                df[col] = df[col].map({"Yes": 1, "No": 0})
+
+        if "Theme" not in df.columns:
+            df["Theme"] = os.path.basename(path).rsplit(".", 1)[0]
+
+        # merge into the store
+        for theme in df["Theme"].unique():
+            part = df[df["Theme"] == theme].copy()
+            st.session_state.store[theme] = (
+                pd.concat([st.session_state.store.get(theme, pd.DataFrame()), part])
+                .reset_index(drop=True)
+            )
+
+# run only the first time
+if not st.session_state.store:
+    autoload_from_folder()
+
+# ────────────────────────────────────────────────────────────────
+# 3. From here on you can safely build the UI
+# ────────────────────────────────────────────────────────────────
+st.title("PEER Interactive Data Portal")
+
+if not st.session_state.store:
+    st.info("No datasets yet – use the sidebar uploader.")
+    st.stop()
+
+themes = sorted(st.session_state.store.keys())   # ← now guaranteed to work
+theme  = st.selectbox("Theme", themes)
+df     = st.session_state.store[theme]
+
+# … keep the rest of your code (region / income / country selectors,
+#    chart drawing, export buttons, etc.) …
+
 st.set_page_config(page_title="PEER Data Portal", layout="wide")
 
 ##############################################################################
