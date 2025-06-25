@@ -48,6 +48,19 @@ def autoload_from_folder(folder="data"):
 if not st.session_state.store:
     autoload_from_folder()
 
+# group
+# DEBUG: see exactly what columns you have
+st.write("DEBUG columns:", data.columns.tolist())
+
+# Let user pick the grouping column
+group = st.selectbox("Group by", ["Country", "Region", "Income"])
+
+# Now we’re sure this column exists...
+if group not in data.columns:
+    st.error(f"Column '{group}' not found in data")
+    st.stop()
+
+
 # ───────── 3. Sidebar uploader – can add more datasets on the fly ──────────
 with st.sidebar:
     st.header("⬆️  Upload dataset(s)")
@@ -194,33 +207,6 @@ if not numeric_sel_inds:
 
 # 3. Perform the aggregation
 #plot_df = data.groupby(group)[numeric_sel_inds].agg(func).reset_index()
-# ─── Sanity checks before aggregation ──────────────────────────────────
-# 1. Ensure the grouping column exists
-if group not in data.columns:
-    st.error(f"Cannot group by '{group}': column not in the data.")
-    st.stop()
-
-# 2. Ensure at least one valid numeric indicator
-if not numeric_sel_inds:
-    st.warning("No numeric indicators to aggregate. Please select at least one numeric column.")
-    st.stop()
-
-# 3. Make absolutely sure all indicators exist in the filtered data
-missing = [c for c in numeric_sel_inds if c not in data.columns]
-if missing:
-    st.error(f"The following indicators are missing from the data and cannot be plotted: {', '.join(missing)}")
-    st.stop()
-
-# ─── Do the aggregation inside a try/except ───────────────────────────
-try:
-    plot_df = (
-        data
-        .groupby(group, as_index=False)[numeric_sel_inds]
-        .agg(func)
-    )
-except Exception as e:
-    st.error(f"Unexpected error during aggregation:\n\n{e}")
-    st.stop()
 
 
 # plot_df = data.groupby(group)[numeric_sel_inds].agg(func).reset_index()
