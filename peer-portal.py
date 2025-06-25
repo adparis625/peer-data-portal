@@ -1,3 +1,7 @@
+import os, glob, streamlit as st
+st.write("DEBUG files found:", glob.glob("data/*"))
+st.write("DEBUG cwd:", os.getcwd())
+
 import io, glob, numpy as np, pandas as pd, streamlit as st, plotly.express as px
 import pycountry
 
@@ -7,6 +11,14 @@ st.set_page_config(page_title="PEER Data Portal", layout="wide")
 if "store" not in st.session_state or not isinstance(st.session_state.store, dict):
     st.session_state.store = {}
 
+for theme in df["Theme"].unique():
+    part = df[df["Theme"] == theme]
+    if theme in st.session_state.store:
+        st.session_state.store[theme] = (
+            pd.concat([st.session_state.store[theme], part]).reset_index(drop=True)
+        )
+    else:
+        st.session_state.store[theme] = part.reset_index(drop=True)
 # ── UPLOAD SIDEBAR ─────────────────────────────────────────────────────────
 with st.sidebar:
     st.header("⬆️ Upload dataset(s)")
