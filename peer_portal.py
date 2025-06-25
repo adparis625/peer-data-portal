@@ -121,33 +121,30 @@ data = df.loc[mask, ["Country", "Region", "Income"] + sel_inds].copy()
 
 st.subheader("Filtered table")
 
+st.subheader("Filtered table")
 
-# show the data in read-only mode but allow row selection
+# 1  display the table (read-only) with a widget key
 table = st.data_editor(
     data,
     hide_index=True,
-    disabled=True,         # make it view-only
+    disabled=True,
     height=300,
-    use_container_width=True
+    use_container_width=True,
+    key="data_table"          # ← important
 )
 
-rows = table["selected_rows"]
+# 2  get the list of selected row indices
+rows = st.session_state["data_table"]["selected_rows"]   # ← use the key
 if rows:
-    row_dict = rows[0]                       # first selected row as dict
-    url = row_dict.get("SnapshotURL")        # fetch the link
-    if url:                                  # show only if present
+    # rows is a list of row numbers; take the first one
+    idx = rows[0]
+    snap_url = data.iloc[idx].get("SnapshotURL")
+    if snap_url:
         st.markdown(
             f"**Policy snapshot:** "
-            f"[{url}]({url})",
+            f"[{snap_url}]({snap_url})",
             unsafe_allow_html=True
         )
-
-#st.dataframe(data, use_container_width=True)
-#row_clicked = st.dataframe(data, use_container_width=True).selected_rows
-#if row_clicked:
-#    url = row_clicked[0].get("SnapshotURL")
-#    if url:
-#        st.markdown(f"**Policy snapshot:** [{url}]({url})", unsafe_allow_html=True)
 
 
 # download buttons
