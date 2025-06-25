@@ -9,8 +9,7 @@ st.set_page_config(page_title="PEER Data Portal", layout="wide")
 ##############################################################################
 if "store" not in st.session_state:
     st.session_state.store = {}      # {Theme -> DataFrame}
-for path in glob.glob("data/*.xlsx"):
-    
+ 
 
 ##############################################################################
 # 2) UPLOAD AREA (left sidebar, visible to all)
