@@ -6,6 +6,8 @@ import streamlit as st
 import plotly.express as px
 import pycountry
 import streamlit_plotly_events as spe
+from streamlit_plotly_events import plotly_events
+
 
 st.set_page_config(page_title="PEER Data Portal", layout="wide")
 
