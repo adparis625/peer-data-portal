@@ -169,10 +169,23 @@ st.download_button("⬇️ XLSX", xls, "peer_filtered.xlsx",
                    key="xlsx_dl")
 
 # ───────── 6. Prepare data for plotting ────────────────────────────────────
+# Filter indicators to only numeric columns for mean/median aggregation
+numeric_sel_inds = [c for c in sel_inds if pd.api.types.is_numeric_dtype(data[c])]
+skipped = [c for c in sel_inds if c not in numeric_sel_inds]
+if not numeric_sel_inds:
+    st.warning("No numeric indicators selected – cannot compute mean/median.")
+    st.stop()
+if skipped:
+    st.info(f"Ignoring non-numeric indicators: {', '.join(skipped)}")
+
+# plot_df = data.groupby(group)[numeric_sel_inds].agg(func).reset_index()
+
+
 if chart_type in ["Bar", "Radar", "Map", "Funnel"]:
     group = "Country" if countries else "Region"
     func  = np.mean if stat == "Mean" else np.median
-    plot_df = data.groupby(group)[sel_inds].agg(func).reset_index()
+    plot_df = data.groupby(group)[numeric_sel_inds].agg(func).reset_index()
+
 else:
     plot_df = data.copy()
 
