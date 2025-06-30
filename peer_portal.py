@@ -88,155 +88,123 @@ if not st.session_state.store:
 theme = st.selectbox("Theme", sorted(st.session_state.store.keys()))
 df    = st.session_state.store[theme]
 
-regions   = st.multiselect("Region(s)", sorted(df["Region"].dropna().unique()),
-                            default=sorted(df["Region"].dropna().unique()))
-incomes   = st.multiselect("Income group(s)", sorted(df["Income"].dropna().unique()),
-                            default=sorted(df["Income"].dropna().unique()))
-countries = st.multiselect("Country(ies)",
-               sorted(df[df["Region"].isin(regions)]["Country"].unique()))
-
-ind_cols = [c for c in df.columns if c not in ("Theme", "Country", "Region", "Income")]
-sel_inds = st.multiselect("Indicator(s)", ind_cols, default=ind_cols[:1])
-
-stat = st.radio("Statistic", ["Mean", "Median"], horizontal=True)
-func = np.mean if stat == "Mean" else np.median
-
-chart_type = st.selectbox("Chart type",
-    ["Bar", "Line", "Scatter", "Radar", "Funnel", "Map"]
+# ─── 5. Optional filters ───────────────────────────────────────────────
+regions   = st.multiselect(
+    "Region(s) (optional)", 
+    options=sorted(df["Region"].dropna().unique()), default=[]
+)
+incomes   = st.multiselect(
+    "Income group(s) (optional)", 
+    options=sorted(df["Income"].dropna().unique()), default=[]
+)
+countries = st.multiselect(
+    "Country(ies) (optional)", 
+    options=sorted(df["Country"].unique()), default=[]
 )
 
-# ─── 5. Filter DataFrame ─────────────────────────────────────────────
-mask = df["Region"].isin(regions) & df["Income"].isin(incomes)
+mask = pd.Series(True, index=df.index)
+if regions:
+    mask &= df["Region"].isin(regions)
+if incomes:
+    mask &= df["Income"].isin(incomes)
 if countries:
     mask &= df["Country"].isin(countries)
-data = df.loc[mask, ["Country", "Region", "Income"] + sel_inds].copy()
+data = df.loc[mask, ["Country","Region","Income"] + [c for c in df.columns 
+           if c not in ("Theme","Country","Region","Income")]].copy()
 
-st.subheader("Filtered table")
+st.subheader("Filtered data")
 st.dataframe(data, use_container_width=True)
+# ─── 7. Indicator & stat selection ─────────────────────────────────────
+ind_cols = [c for c in data.columns if c not in ("Theme","Country","Region","Income")]
+sel_inds = st.multiselect("Indicator(s)", ind_cols, default=ind_cols[:1])
+stat     = st.radio("Statistic", ["Mean","Median"], horizontal=True)
+func     = np.mean if stat=="Mean" else np.median
 
-# ─── 6. Download ─────────────────────────────────────────────────────
+# ─── 8. Group selection ────────────────────────────────────────────────
+group = st.selectbox("Group by", ["None","Country","Region","Income"], index=0)
+
+# ─── 9. CSV/XLSX download ──────────────────────────────────────────────
 csv = data.to_csv(index=False).encode()
-xlsb = io.BytesIO(); data.to_excel(xlsb, index=False); xlsb.seek(0)
-st.download_button("⬇️ Download CSV", csv, "data.csv", "text/csv")
-st.download_button("⬇️ Download XLSX", xlsb, "data.xlsx",
+xls = io.BytesIO(); data.to_excel(xls,index=False); xls.seek(0)
+st.download_button("⬇️ Download CSV",  csv, "data.csv","text/csv")
+st.download_button("⬇️ Download XLSX", xls, "data.xlsx",
                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-# ─── 7. Prepare for plotting ─────────────────────────────────────────
+# ─── 10. Prepare plotting DataFrame ───────────────────────────────────
+# Coerce selected columns to numeric
 for c in sel_inds:
-    if c in data.columns:
-        data[c] = pd.to_numeric(data[c], errors="coerce")
+    data[c] = pd.to_numeric(data[c], errors="coerce")
 
-numeric_sel = [c for c in sel_inds if pd.api.types.is_numeric_dtype(data[c])]
-if not numeric_sel:
-    st.warning("Select at least one numeric indicator to plot.")
-    st.stop()
-
-# For Map, force grouping by Country
-if chart_type == "Map":
-    group = "Country"
-else:
-    group = st.selectbox("Group by", ["Country", "Region", "Income"])
-    if group not in data.columns:
-        st.error(f"Column '{group}' not found.")
-        st.stop()
-
-if chart_type in ["Bar", "Radar", "Map", "Funnel"]:
-    plot_df = data.groupby(group, as_index=False)[numeric_sel].agg(func)
+# Build plot_df based on chart needs and grouping
+chart_type = st.selectbox("Chart type",
+    ["Bar","Line","Scatter","Radar","Funnel","Map"]
+)
+if chart_type in ["Bar","Radar","Funnel","Map"]:
+    if group=="None":
+        if chart_type!="Map":
+            st.warning("Select a Group for this chart type.")
+            st.stop()
+        # Map will always group by Country if None
+        agg_df = data.groupby("Country",as_index=False)[sel_inds].agg(func)
+    else:
+        agg_df = data.groupby(group,as_index=False)[sel_inds].agg(func)
+    plot_df = agg_df
 else:
     plot_df = data.copy()
 
-if plot_df.empty:
+if plot_df.empty or not sel_inds:
     st.warning("No data to plot.")
     st.stop()
 
-# ─── 8. Build chart ───────────────────────────────────────────────────
-if chart_type == "Bar":
-    fig = px.bar(plot_df, x=group, y=numeric_sel, barmode="group")
-elif chart_type == "Line":
-    fig = px.line(plot_df, x=group, y=numeric_sel)
-elif chart_type == "Scatter" and len(numeric_sel) >= 2:
-    fig = px.scatter(plot_df, x=numeric_sel[0], y=numeric_sel[1],
-                     color=group, hover_name=group)
-elif chart_type == "Radar" and len(numeric_sel) >= 2:
-    long = plot_df.melt(id_vars=group, value_vars=numeric_sel)
+# ─── 11. Build & show the chart ────────────────────────────────────────
+if chart_type=="Bar":
+    fig = px.bar(plot_df, x=(group if group!="None" else sel_inds[0]),
+                 y=sel_inds, barmode="group")
+elif chart_type=="Line":
+    fig = px.line(plot_df, x=(group if group!="None" else sel_inds[0]),
+                  y=sel_inds)
+elif chart_type=="Scatter" and len(sel_inds)>=2:
+    fig = px.scatter(plot_df, x=sel_inds[0], y=sel_inds[1],
+                     color=(group if group!="None" else None),
+                     hover_name="Country")
+elif chart_type=="Radar" and len(sel_inds)>=2:
+    long = plot_df.melt(id_vars=(group if group!="None" else sel_inds[0]),
+                        value_vars=sel_inds)
     fig = px.line_polar(long, r="value", theta="variable",
-                        color=group, line_close=True)
-elif chart_type == "Funnel":
-    funnel = plot_df[numeric_sel].sum().reset_index()
-    funnel.columns = ["Stage", "Value"]
+                        color=(group if group!="None" else None),
+                        line_close=True)
+elif chart_type=="Funnel":
+    funnel = plot_df[sel_inds].sum().reset_index()
+    funnel.columns = ["Stage","Value"]
     fig = px.funnel(funnel, x="Value", y="Stage")
-elif chart_type == "Map":
-    ind = numeric_sel[0]  # your chosen indicator column
-
-    # 1) Aggregate so one row per country
-    plot_df = data.groupby("Country", as_index=False)[[ind]].agg(func)
-
-    # 2) Turn any “999” placeholders into NaN
+elif chart_type=="Map":
+    ind = sel_inds[0]
     plot_df[ind] = plot_df[ind].replace(999, np.nan)
-
-    # 3) Drop rows with no data
-    plot_df = plot_df.dropna(subset=[ind])
-    if plot_df.empty:
-        st.warning("No mappable data for this filter / indicator.")
-        st.stop()
-
-    # 4) Build the map by *country names*, not ISO
+    d = plot_df.dropna(subset=[ind])
     fig = px.choropleth(
-        plot_df,
-        locations="Country",
-        locationmode="country names",
-        color=ind,
-        hover_name="Country",
-        color_continuous_scale="Blues",
-        title=f"{stat} of {ind} by country"
+        d, locations="Country", locationmode="country names",
+        color=ind, hover_name="Country", color_continuous_scale="Blues"
     )
+else:
+    st.info("Select ≥2 indicators for Scatter/Radar.")
+    st.stop()
 
-    # 5) If you’d prefer a discrete palette when few categories:
-    vals = plot_df[ind].dropna().unique()
-    if len(vals) <= 10:
-        plot_df["cat"] = plot_df[ind].astype(str)
-        fig = px.choropleth(
-            plot_df,
-            locations="Country",
-            locationmode="country names",
-            color="cat",
-            hover_name="Country",
-            color_discrete_sequence=px.colors.qualitative.Safe,
-            title=f"{ind} categories by country"
-        )
-
-    fig.update_layout(margin=dict(l=20, r=20, t=40, b=20), height=550)
-
-    
-# ─── 9. Display chart + click handler ─────────────────────────────────
-# ─── 9. Display chart + click handler ─────────────────────────────────
+fig.update_layout(margin=dict(l=20,r=20,t=40,b=20), height=550)
 st.subheader(f"{chart_type} – {stat}")
 st.plotly_chart(fig, use_container_width=True)
 
+# ─── 12. Chart click → snapshot link ───────────────────────────────────
 events = plotly_events(fig, click_event=True, hover_event=False)
 if events:
     ev = events[0]
-    # try 'x' or 'hovertext' (bar, line, etc.)
-    country_clicked = ev.get("x") or ev.get("hovertext")
-
-    # if it’s the Map chart, fallback to ISO3 in 'location'
-    if chart_type == "Map" and not country_clicked:
-        iso_clicked = ev.get("location")
-        match = plot_df[plot_df["iso"] == iso_clicked]
-        if not match.empty:
-            country_clicked = match["Country"].iat[0]
-
-    # now show the snapshot URL if we have a country
+    country_clicked = ev.get("x") or ev.get("hovertext") or ev.get("location")
     if country_clicked:
-        snap = data.loc[
-            data["Country"] == country_clicked, "SnapshotURL"
-        ].dropna()
+        snap = data.loc[data["Country"]==country_clicked,"SnapshotURL"].dropna()
         if not snap.empty:
             st.markdown(
-                f"**Policy snapshot for {country_clicked}:** "
-                f"[Open link]({snap.iat[0]})"
+              f"**Policy snapshot for {country_clicked}:** "
+              f"[Open link]({snap.iat[0]})"
             )
-        else:
-            st.info(f"No snapshot available for {country_clicked}.")
+
 
 
