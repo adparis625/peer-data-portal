@@ -228,17 +228,14 @@ st.plotly_chart(fig, use_container_width=True)
 events = plotly_events(fig, click_event=True, hover_event=False)
 if events:
     ev = events[0]
-    country_clicked = ev.get("x") or ev.get("hovertext") or ev.get("location")
+    country_clicked = ev.get("location") or ev.get("x") or ev.get("hovertext")
     if country_clicked:
-        snap = data.loc[data["Country"]==country_clicked,"SnapshotURL"].dropna()
+        snap = data.loc[data["Country"]==country_clicked, "SnapshotURL"].dropna()
         if not snap.empty:
+            url = snap.iat[0]
             st.markdown(
-              f"**Policy snapshot for {country_clicked}:** "
-              f"[Open link]({snap.iat[0]})"
+                f'<a href="{url}" target="_blank">▶️ Open full country profile</a>',
+                unsafe_allow_html=True
             )
-
-
         else:
             st.info(f"No snapshot available for {country_clicked}.")
-
-
