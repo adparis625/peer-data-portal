@@ -166,8 +166,6 @@ elif chart_type == "Funnel":
     funnel.columns = ["Stage", "Value"]
     fig = px.funnel(funnel, x="Value", y="Stage")
 elif chart_type == "Map":
-
-    elif chart_type == "Map":
     ind = numeric_sel[0]  # your chosen numeric indicator
     
     # 1) Debug: show a sample of the filtered data
