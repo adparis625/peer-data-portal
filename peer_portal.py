@@ -177,20 +177,51 @@ elif chart_type=="Funnel":
     funnel = plot_df[sel_inds].sum().reset_index()
     funnel.columns = ["Stage","Value"]
     fig = px.funnel(funnel, x="Value", y="Stage")
-elif chart_type=="Map":
+elif chart_type == "Map":
     ind = sel_inds[0]
+
+    # 1) Recode 999→NaN and drop missing
     plot_df[ind] = plot_df[ind].replace(999, np.nan)
     d = plot_df.dropna(subset=[ind])
-    fig = px.choropleth(
-        d, locations="Country", locationmode="country names",
-        color=ind, hover_name="Country", color_continuous_scale="Blues"
-    )
+    if d.empty:
+        st.warning("No mappable data for this filter / indicator.")
+        st.stop()
+
+    # 2) Choose discrete vs continuous
+    uniq = d[ind].dropna().unique()
+    if len(uniq) <= 10:
+        # Discrete palette
+        d["cat"] = d[ind].astype(str)
+        fig = px.choropleth(
+            d,
+            locations="Country",
+            locationmode="country names",
+            color="cat",
+            hover_name="Country",
+            color_discrete_sequence=px.colors.qualitative.Safe,
+            title=f"{ind} categories by country"
+        )
+    else:
+        # Continuous gradient
+        fig = px.choropleth(
+            d,
+            locations="Country",
+            locationmode="country names",
+            color=ind,
+            hover_name="Country",
+            color_continuous_scale="Blues",
+            title=f"{stat} of {ind} by country"
+        )
+
+    fig.update_layout(margin=dict(l=20, r=20, t=40, b=20), height=550)
+
 else:
     st.info("Select ≥2 indicators for Scatter/Radar.")
     st.stop()
 
 fig.update_layout(margin=dict(l=20,r=20,t=40,b=20), height=550)
 st.subheader(f"{chart_type} – {stat}")
+
 st.plotly_chart(fig, use_container_width=True)
 
 # ─── 12. Chart click → snapshot link ───────────────────────────────────
@@ -206,5 +237,8 @@ if events:
               f"[Open link]({snap.iat[0]})"
             )
 
+
+        else:
+            st.info(f"No snapshot available for {country_clicked}.")
 
 
