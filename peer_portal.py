@@ -166,56 +166,45 @@ elif chart_type == "Funnel":
     funnel.columns = ["Stage", "Value"]
     fig = px.funnel(funnel, x="Value", y="Stage")
 elif chart_type == "Map":
-    ind = numeric_sel[0]  # your chosen numeric indicator
-    
-    # 1) Debug: show a sample of the filtered data
-    st.write("🔎 [Map Debug] sample of filtered data:", 
-             data[["Country", ind]].head(10))
-    st.write(f"🔎 [Map Debug] total rows in data: {len(data)}")
-    
-    # 2) Aggregate by country (one value per country)
-    plot_df = (
-        data
-        .groupby("Country", as_index=False)[ind]
-        .agg(func)
-    )
-    st.write("🔎 [Map Debug] after aggregation (groupby):", plot_df.head(10))
-    st.write(f"🔎 [Map Debug] rows after aggregation: {len(plot_df)}")
-    
-    # 3) Convert any 999 placeholder to NaN
-    plot_df[ind] = plot_df[ind].replace(999, np.nan)
-    st.write(f"🔎 [Map Debug] nulls in '{ind}' after 999→NaN:",
-             plot_df[ind].isna().sum(), "/", len(plot_df))
-    
-    # 4) ISO3 lookup with robust fallback
-    def to_iso3(name):
-        try:
-            return pycountry.countries.lookup(name).alpha_3
-        except Exception:
-            return None
+    ind = numeric_sel[0]  # your chosen indicator column
 
-    plot_df["iso"] = plot_df["Country"].apply(to_iso3)
-    st.write(f"🔎 [Map Debug] ISO nulls:", 
-             plot_df["iso"].isna().sum(), "/", len(plot_df))
-    st.write("🔎 [Map Debug] sample ISO mapping:", plot_df[["Country","iso"]].head(10))
-    
-    # 5) Drop rows missing either iso or a real value
-    clean = plot_df.dropna(subset=["iso", ind])
-    st.write(f"🔎 [Map Debug] rows after dropna:", len(clean))
-    if clean.empty:
-        st.warning("No mappable data for this filter / indicator.  \
-    (see the 🔎 debug prints above)")
+    # 1) Aggregate so one row per country
+    plot_df = data.groupby("Country", as_index=False)[[ind]].agg(func)
+
+    # 2) Turn any “999” placeholders into NaN
+    plot_df[ind] = plot_df[ind].replace(999, np.nan)
+
+    # 3) Drop rows with no data
+    plot_df = plot_df.dropna(subset=[ind])
+    if plot_df.empty:
+        st.warning("No mappable data for this filter / indicator.")
         st.stop()
-    
-    # 6) Finally draw the map
+
+    # 4) Build the map by *country names*, not ISO
     fig = px.choropleth(
-        clean,
-        locations="iso",
+        plot_df,
+        locations="Country",
+        locationmode="country names",
         color=ind,
         hover_name="Country",
         color_continuous_scale="Blues",
         title=f"{stat} of {ind} by country"
     )
+
+    # 5) If you’d prefer a discrete palette when few categories:
+    vals = plot_df[ind].dropna().unique()
+    if len(vals) <= 10:
+        plot_df["cat"] = plot_df[ind].astype(str)
+        fig = px.choropleth(
+            plot_df,
+            locations="Country",
+            locationmode="country names",
+            color="cat",
+            hover_name="Country",
+            color_discrete_sequence=px.colors.qualitative.Safe,
+            title=f"{ind} categories by country"
+        )
+
     fig.update_layout(margin=dict(l=20, r=20, t=40, b=20), height=550)
 
     
