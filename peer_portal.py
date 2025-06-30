@@ -157,85 +157,113 @@ if plot_df.empty or not sel_inds:
     st.stop()
 
 # ─── 11. Build & show the chart ────────────────────────────────────────
-if chart_type=="Bar":
-    fig = px.bar(plot_df, x=(group if group!="None" else sel_inds[0]),
-                 y=sel_inds, barmode="group")
-elif chart_type=="Line":
-    fig = px.line(plot_df, x=(group if group!="None" else sel_inds[0]),
-                  y=sel_inds)
-elif chart_type=="Scatter" and len(sel_inds)>=2:
-    fig = px.scatter(plot_df, x=sel_inds[0], y=sel_inds[1],
-                     color=(group if group!="None" else None),
-                     hover_name="Country")
-elif chart_type=="Radar" and len(sel_inds)>=2:
-    long = plot_df.melt(id_vars=(group if group!="None" else sel_inds[0]),
-                        value_vars=sel_inds)
-    fig = px.line_polar(long, r="value", theta="variable",
-                        color=(group if group!="None" else None),
-                        line_close=True)
-elif chart_type=="Funnel":
-    funnel = plot_df[sel_inds].sum().reset_index()
-    funnel.columns = ["Stage","Value"]
-    fig = px.funnel(funnel, x="Value", y="Stage")
-elif chart_type == "Map":
-    ind = sel_inds[0]
+# ─── 11. Build & display one chart per selected indicator ────────────
+for ind in sel_inds:
+    st.markdown(f"### Indicator: **{ind}**")
 
-    # 1) Recode 999→NaN and drop missing
-    plot_df[ind] = plot_df[ind].replace(999, np.nan)
-    d = plot_df.dropna(subset=[ind])
-    if d.empty:
-        st.warning("No mappable data for this filter / indicator.")
-        st.stop()
-
-    # 2) Choose discrete vs continuous
-    uniq = d[ind].dropna().unique()
-    if len(uniq) <= 10:
-        # Discrete palette
-        d["cat"] = d[ind].astype(str)
-        fig = px.choropleth(
-            d,
-            locations="Country",
-            locationmode="country names",
-            color="cat",
-            hover_name="Country",
-            color_discrete_sequence=px.colors.qualitative.Safe,
-            title=f"{ind} categories by country"
-        )
+    # Prepare per‐indicator DataFrame
+    if chart_type in ["Bar","Radar","Funnel","Map"]:
+        if chart_type == "Map":
+            df_ind = data.groupby("Country", as_index=False)[[ind]].agg(func)
+        else:
+            df_ind = data.groupby(
+                group if group!="None" else "Country",
+                as_index=False
+            )[[ind]].agg(func)
     else:
-        # Continuous gradient
-        fig = px.choropleth(
-            d,
-            locations="Country",
-            locationmode="country names",
-            color=ind,
-            hover_name="Country",
-            color_continuous_scale="Blues",
-            title=f"{stat} of {ind} by country"
+        df_ind = data.copy()
+
+    # Clean and drop 999/NaN
+    df_ind[ind] = df_ind[ind].replace(999, np.nan)
+    df_ind = df_ind.dropna(subset=[ind])
+    if df_ind.empty:
+        st.warning(f"No data to plot for **{ind}**.")
+        continue
+
+    # Build the figure
+    if chart_type == "Bar":
+        fig = px.bar(
+            df_ind,
+            x=(group if group!="None" else "Country"),
+            y=ind,
+            title=f"{stat} of {ind}"
         )
-
-    fig.update_layout(margin=dict(l=20, r=20, t=40, b=20), height=550)
-
-else:
-    st.info("Select ≥2 indicators for Scatter/Radar.")
-    st.stop()
-
-fig.update_layout(margin=dict(l=20,r=20,t=40,b=20), height=550)
-st.subheader(f"{chart_type} – {stat}")
-
-st.plotly_chart(fig, use_container_width=True)
-
-# ─── 12. Chart click → snapshot link ───────────────────────────────────
-events = plotly_events(fig, click_event=True, hover_event=False)
-if events:
-    ev = events[0]
-    country_clicked = ev.get("location") or ev.get("x") or ev.get("hovertext")
-    if country_clicked:
-        snap = data.loc[data["Country"]==country_clicked, "SnapshotURL"].dropna()
-        if not snap.empty:
-            url = snap.iat[0]
-            st.markdown(
-                f'<a href="{url}" target="_blank">▶️ Open full country profile</a>',
-                unsafe_allow_html=True
+    elif chart_type == "Line":
+        fig = px.line(
+            df_ind,
+            x=(group if group!="None" else "Country"),
+            y=ind,
+            title=f"{stat} of {ind}"
+        )
+    elif chart_type == "Scatter" and len(sel_inds)>=2:
+        other = sel_inds[1] if sel_inds[0]==ind and len(sel_inds)>1 else sel_inds[0]
+        fig = px.scatter(
+            data,
+            x=other,
+            y=ind,
+            color=(group if group!="None" else None),
+            hover_name="Country",
+            title=f"{ind} vs {other}"
+        )
+    elif chart_type == "Radar" and len(sel_inds)>=2:
+        long = df_ind.melt(
+            id_vars=(group if group!="None" else "Country"),
+            value_vars=sel_inds
+        )
+        fig = px.line_polar(
+            long,
+            r="value",
+            theta="variable",
+            color=(group if group!="None" else None),
+            line_close=True,
+            title=f"Radar: {ind}"
+        )
+    elif chart_type == "Funnel":
+        funnel = df_ind[ind].reset_index()
+        funnel.columns = ["Stage","Value"]
+        fig = px.funnel(funnel, x="Value", y="Stage", title=f"Funnel: {ind}")
+    elif chart_type == "Map":
+        uniq = df_ind[ind].unique()
+        if len(uniq) <= 10:
+            df_ind["cat"] = df_ind[ind].astype(str)
+            fig = px.choropleth(
+                df_ind,
+                locations="Country",
+                locationmode="country names",
+                color="cat",
+                hover_name="Country",
+                color_discrete_sequence=px.colors.qualitative.Safe,
+                title=f"{ind} categories"
             )
         else:
-            st.info(f"No snapshot available for {country_clicked}.")
+            fig = px.choropleth(
+                df_ind,
+                locations="Country",
+                locationmode="country names",
+                color=ind,
+                hover_name="Country",
+                color_continuous_scale="Blues",
+                title=f"{stat} of {ind}"
+            )
+    else:
+        st.info("Select ≥2 indicators for Scatter/Radar.")
+        break
+
+    fig.update_layout(margin=dict(l=20,r=20,t=40,b=20), height=450)
+
+    # Display the chart and capture clicks
+    st.plotly_chart(fig, use_container_width=True, key=f"chart_{ind}")
+    evs = plotly_events(fig, click_event=True, hover_event=False, key=f"evt_{ind}")
+    if evs:
+        evt = evs[0]
+        country = evt.get("location") or evt.get("x") or evt.get("hovertext")
+        if country:
+            snap = data.loc[data["Country"]==country, "SnapshotURL"].dropna()
+            if not snap.empty:
+                url = snap.iat[0]
+                st.markdown(
+                    f'<a href="{url}" target="_blank">▶️ Open full country profile</a>',
+                    unsafe_allow_html=True
+                )
+            else:
+                st.info(f"No snapshot available for {country}.")
