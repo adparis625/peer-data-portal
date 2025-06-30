@@ -215,7 +215,12 @@ elif chart_type == "Map":
     plot_df["iso"] = plot_df[group].apply(to_iso3)
     
     plot_df = plot_df.dropna(subset=["iso", ind])
-   #  3) Drop rows missing either iso or value
+   
+    st.write("▶️ Preview of map DataFrame before dropping:", plot_df.head(10))
+st.write("ISO nulls:", plot_df["iso"].isna().sum(), "/", len(plot_df))
+st.write(f"Indicator `{ind}` nulls:", plot_df[ind].isna().sum(), "/", len(plot_df))
+  
+#  3) Drop rows missing either iso or value
     plot_df = plot_df.dropna(subset=["iso", ind])
     if plot_df.empty:
         st.warning("No mappable data for this filter / indicator.")
