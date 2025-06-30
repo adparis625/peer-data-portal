@@ -217,8 +217,8 @@ elif chart_type == "Map":
     plot_df = plot_df.dropna(subset=["iso", ind])
    
     st.write("▶️ Preview of map DataFrame before dropping:", plot_df.head(10))
-st.write("ISO nulls:", plot_df["iso"].isna().sum(), "/", len(plot_df))
-st.write(f"Indicator `{ind}` nulls:", plot_df[ind].isna().sum(), "/", len(plot_df))
+    st.write("ISO nulls:", plot_df["iso"].isna().sum(), "/", len(plot_df))
+    st.write(f"Indicator `{ind}` nulls:", plot_df[ind].isna().sum(), "/", len(plot_df))
   
 #  3) Drop rows missing either iso or value
     plot_df = plot_df.dropna(subset=["iso", ind])
