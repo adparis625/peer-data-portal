@@ -1,4 +1,6 @@
 # peer_portal.py
+# this is anna d'addio copyright, please do not reproduce without the right citation
+
 
 import io, os, glob
 import numpy as np
