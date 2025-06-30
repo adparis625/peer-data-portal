@@ -158,6 +158,24 @@ if plot_df.empty or not sel_inds:
 
 # ─── 11. Build & show the chart ────────────────────────────────────────
 # ─── 11. Build & display one chart per selected indicator ────────────
+# ─── Prep a global discrete colour map ────────────────────────────────
+# 1) Pick up all unique category values (as strings) across selected indicators
+all_cats = set()
+for ind in sel_inds:
+    vals = data[ind].dropna().unique()
+    # only include “small” sets (you only discrete-map when ≤10 anyway)
+    if len(vals) <= 10:
+        all_cats.update(str(v) for v in vals)
+
+# 2) Choose your palette and assign each cat a colour
+palette = px.colors.qualitative.Safe
+discrete_color_map = {
+    cat: palette[i % len(palette)]
+    for i, cat in enumerate(sorted(all_cats))
+}
+
+
+
 for ind in sel_inds:
     st.markdown(f"### Indicator: **{ind}**")
 
