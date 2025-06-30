@@ -232,7 +232,7 @@ for ind in sel_inds:
                 locationmode="country names",
                 color="cat",
                 hover_name="Country",
-                color_discrete_sequence=px.colors.qualitative.Safe,
+                color_discrete_map=discrete_color_map,    # ← use the global map,
                 title=f"{ind} categories"
             )
         else:
